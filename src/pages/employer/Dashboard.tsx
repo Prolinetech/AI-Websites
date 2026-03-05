@@ -15,7 +15,7 @@ interface Job {
   salary: string;
   created_at: string;
   applicant_count: number;
-  status: 'Active' | 'Closed'; // Mock status for now
+  status: 'Active' | 'Closed';
 }
 
 interface Applicant {
@@ -42,10 +42,22 @@ const EmployerDashboard = () => {
   const [templateLevel, setTemplateLevel] = useState('All');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [viewingTemplate, setViewingTemplate] = useState<any | null>(null);
+  const [previewLayout, setPreviewLayout] = useState<'classic' | 'modern'>('classic');
+  const [customTemplates, setCustomTemplates] = useState<any[]>([]);
   
   // Job Search State
   const [jobSearch, setJobSearch] = useState('');
   const [jobStatusFilter, setJobStatusFilter] = useState('All');
+
+  const [uploadForm, setUploadForm] = useState({
+    title: '',
+    department: 'Food & Beverage',
+    level: 'Entry Level',
+    summary: '',
+    experience: '',
+    skills: '',
+    education: ''
+  });
 
   const [jobForm, setJobForm] = useState({
     title: '',
@@ -58,9 +70,7 @@ const EmployerDashboard = () => {
   const fetchJobs = async () => {
     try {
       const response = await axios.get('/api/employer/jobs');
-      // Add mock status if not present in DB yet
-      const jobsWithStatus = response.data.map((j: any) => ({ ...j, status: 'Active' }));
-      setJobs(jobsWithStatus);
+      setJobs(response.data);
     } catch (error) {
       console.error('Failed to fetch jobs', error);
     } finally {
@@ -71,6 +81,17 @@ const EmployerDashboard = () => {
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  const handleToggleStatus = async (jobId: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'Active' ? 'Closed' : 'Active';
+    try {
+      await axios.patch(`/api/jobs/${jobId}/status`, { status: newStatus });
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, status: newStatus as 'Active' | 'Closed' } : j));
+    } catch (error) {
+      console.error('Failed to update status', error);
+      alert('Failed to update job status');
+    }
+  };
 
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,12 +153,33 @@ const EmployerDashboard = () => {
 
   const handleUploadTemplate = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Template uploaded successfully! (Mock)');
+    const newTemplate = {
+      id: `custom-${Date.now()}`,
+      ...uploadForm,
+      isCustom: true
+    };
+    setCustomTemplates([...customTemplates, newTemplate]);
+    alert('Template uploaded successfully!');
     setShowUploadModal(false);
+    setUploadForm({
+      title: '',
+      department: 'Food & Beverage',
+      level: 'Entry Level',
+      summary: '',
+      experience: '',
+      skills: '',
+      education: ''
+    });
+  };
+
+  const handleUseTemplate = () => {
+    alert(`Template "${viewingTemplate.title}" selected! In a real app, this would start a job posting with this template attached or download it.`);
+    setViewingTemplate(null);
   };
 
   // Filter templates
-  const filteredTemplates = resumeTemplates.filter(t => {
+  const allTemplates = [...customTemplates, ...resumeTemplates];
+  const filteredTemplates = allTemplates.filter(t => {
     const matchesSearch = t.title.toLowerCase().includes(templateSearch.toLowerCase()) || 
                           t.skills.toLowerCase().includes(templateSearch.toLowerCase());
     const matchesCategory = templateCategory === 'All' || t.department === templateCategory;
@@ -269,9 +311,18 @@ const EmployerDashboard = () => {
                     <div key={job.id} className="p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-bold text-navy-900 text-lg">{job.title}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${job.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                        <button 
+                          onClick={() => handleToggleStatus(job.id, job.status)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors hover:opacity-80 flex items-center ${
+                            job.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                          }`}
+                          title="Click to toggle status"
+                        >
                           {job.status}
-                        </span>
+                          <span className="ml-1 text-[10px] opacity-60">
+                            (Change)
+                          </span>
+                        </button>
                       </div>
                       <div className="flex items-center text-sm text-gray-500 space-x-4 mb-4">
                         <span className="flex items-center"><Users className="h-4 w-4 mr-1" /> {job.applicant_count} Applicants</span>
@@ -366,8 +417,12 @@ const EmployerDashboard = () => {
                 <div key={template.id} className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow group">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <div className="p-2 bg-navy-50 rounded-lg text-navy-900 group-hover:bg-gold-500 group-hover:text-white transition-colors">
-                        <FileText className="h-6 w-6" />
+                      <div className={`p-2 rounded-lg transition-colors ${
+                        (template as any).isCustom 
+                          ? 'bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white' 
+                          : 'bg-navy-50 text-navy-900 group-hover:bg-gold-500 group-hover:text-white'
+                      }`}>
+                        {(template as any).isCustom ? <Edit className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
                       </div>
                       <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full font-medium">
                         {template.level}
@@ -490,39 +545,93 @@ const EmployerDashboard = () => {
       </Modal>
 
       {/* Upload Template Modal */}
-      <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Upload Resume Template">
+      <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Create Custom Resume Template">
         <form onSubmit={handleUploadTemplate} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
-            <input type="text" required className="w-full p-2 border rounded-md" placeholder="e.g. Senior Sous Chef" />
+            <input 
+              type="text" 
+              required 
+              className="w-full p-2 border rounded-md" 
+              placeholder="e.g. Senior Sous Chef"
+              value={uploadForm.title}
+              onChange={e => setUploadForm({...uploadForm, title: e.target.value})}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-              <select className="w-full p-2 border rounded-md">
-                <option>Food & Beverage</option>
-                <option>Front Office</option>
-                <option>Housekeeping</option>
-                <option>Culinary</option>
-                <option>Management</option>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={uploadForm.department}
+                onChange={e => setUploadForm({...uploadForm, department: e.target.value})}
+              >
+                {departments.filter(d => d !== 'All').map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
-              <select className="w-full p-2 border rounded-md">
-                <option>Entry Level</option>
-                <option>Mid Level</option>
-                <option>Senior Level</option>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={uploadForm.level}
+                onChange={e => setUploadForm({...uploadForm, level: e.target.value})}
+              >
+                {levels.filter(l => l !== 'All').map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
               </select>
             </div>
           </div>
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Template Content / Structure</label>
-            <textarea rows={6} className="w-full p-2 border rounded-md" placeholder="Paste template structure or content here..." />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Professional Summary (Placeholder)</label>
+            <textarea 
+              rows={3} 
+              className="w-full p-2 border rounded-md" 
+              placeholder="Enter a default summary..."
+              value={uploadForm.summary}
+              onChange={e => setUploadForm({...uploadForm, summary: e.target.value})}
+            />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Key Skills (Comma separated)</label>
+            <input 
+              type="text" 
+              className="w-full p-2 border rounded-md" 
+              placeholder="Cooking, Leadership, Inventory..."
+              value={uploadForm.skills}
+              onChange={e => setUploadForm({...uploadForm, skills: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Experience Structure</label>
+            <textarea 
+              rows={3} 
+              className="w-full p-2 border rounded-md" 
+              placeholder="Describe the typical experience structure..."
+              value={uploadForm.experience}
+              onChange={e => setUploadForm({...uploadForm, experience: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Education Requirements</label>
+            <textarea 
+              rows={2} 
+              className="w-full p-2 border rounded-md" 
+              placeholder="Required degrees or certifications..."
+              value={uploadForm.education}
+              onChange={e => setUploadForm({...uploadForm, education: e.target.value})}
+            />
+          </div>
+
           <div className="pt-4">
             <button type="submit" className="w-full bg-navy-900 text-white font-bold py-3 rounded-lg hover:bg-navy-800">
-              Upload Template
+              Save Custom Template
             </button>
           </div>
         </form>
@@ -531,68 +640,175 @@ const EmployerDashboard = () => {
       {/* Template Preview Modal */}
       <Modal isOpen={!!viewingTemplate} onClose={() => setViewingTemplate(null)} title="Template Preview">
         {viewingTemplate && (
-          <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 bg-gray-100 p-4 rounded-lg">
-            {/* Resume Document Representation */}
-            <div className="bg-white shadow-lg p-8 min-h-[600px] w-full mx-auto max-w-[210mm]">
-              {/* Header */}
-              <div className="text-center border-b-2 border-navy-900 pb-6 mb-6">
-                <h1 className="text-2xl font-bold text-navy-900 uppercase tracking-widest">[Candidate Name]</h1>
-                <div className="flex justify-center space-x-4 text-sm text-gray-600 mt-2">
-                  <span>email@example.com</span>
-                  <span>|</span>
-                  <span>+250 788 000 000</span>
-                  <span>|</span>
-                  <span>Kigali, Rwanda</span>
-                </div>
-                <p className="text-gold-600 font-bold mt-2 uppercase text-sm tracking-wide">{viewingTemplate.title}</p>
-              </div>
+          <div className="flex flex-col h-[80vh]">
+            {/* Layout Selector */}
+            <div className="flex justify-center space-x-4 mb-4">
+              <button 
+                onClick={() => setPreviewLayout('classic')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  previewLayout === 'classic' 
+                    ? 'bg-navy-900 text-white shadow-md' 
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                Classic Layout
+              </button>
+              <button 
+                onClick={() => setPreviewLayout('modern')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  previewLayout === 'modern' 
+                    ? 'bg-navy-900 text-white shadow-md' 
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                Modern Layout
+              </button>
+            </div>
 
-              {/* Summary */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-2 inline-block">Professional Summary</h3>
-                <p className="text-gray-700 text-sm leading-relaxed text-justify">
-                  {viewingTemplate.summary}
-                </p>
-              </div>
+            <div className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded-lg border border-gray-200">
+              {/* Resume Document Representation */}
+              <div className={`bg-white shadow-lg mx-auto max-w-[210mm] min-h-[297mm] transition-all duration-300 ${
+                previewLayout === 'modern' ? 'flex' : 'p-8'
+              }`}>
+                
+                {previewLayout === 'classic' ? (
+                  // CLASSIC LAYOUT
+                  <>
+                    {/* Header */}
+                    <div className="text-center border-b-2 border-navy-900 pb-6 mb-6">
+                      <h1 className="text-3xl font-serif font-bold text-navy-900 uppercase tracking-widest">[Candidate Name]</h1>
+                      <div className="flex justify-center space-x-4 text-sm text-gray-600 mt-3 font-medium">
+                        <span>email@example.com</span>
+                        <span>•</span>
+                        <span>+250 788 000 000</span>
+                        <span>•</span>
+                        <span>Kigali, Rwanda</span>
+                      </div>
+                      <p className="text-gold-600 font-bold mt-2 uppercase text-sm tracking-wide">{viewingTemplate.title}</p>
+                    </div>
 
-              {/* Experience */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-2 inline-block">Experience</h3>
-                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
-                  {viewingTemplate.experience}
-                </div>
-              </div>
+                    {/* Summary */}
+                    <div className="mb-8">
+                      <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-3 inline-block tracking-wider">Professional Summary</h3>
+                      <p className="text-gray-700 text-sm leading-relaxed text-justify">
+                        {viewingTemplate.summary}
+                      </p>
+                    </div>
 
-              {/* Skills */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-2 inline-block">Key Skills</h3>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {viewingTemplate.skills.split(',').map((skill: string, i: number) => (
-                    <span key={i} className="bg-navy-50 text-navy-900 px-2 py-1 rounded text-xs font-medium">
-                      {skill.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
+                    {/* Experience */}
+                    <div className="mb-8">
+                      <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-3 inline-block tracking-wider">Experience</h3>
+                      <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                        {viewingTemplate.experience}
+                      </div>
+                    </div>
 
-              {/* Education */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-2 inline-block">Education</h3>
-                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
-                  {viewingTemplate.education}
-                </div>
+                    {/* Skills */}
+                    <div className="mb-8">
+                      <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-3 inline-block tracking-wider">Key Skills</h3>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {viewingTemplate.skills.split(',').map((skill: string, i: number) => (
+                          <span key={i} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-medium border border-gray-200">
+                            {skill.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Education */}
+                    <div className="mb-8">
+                      <h3 className="text-sm font-bold text-navy-900 uppercase border-b border-gold-500 mb-3 inline-block tracking-wider">Education</h3>
+                      <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                        {viewingTemplate.education}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // MODERN LAYOUT
+                  <>
+                    {/* Sidebar (Left) */}
+                    <div className="w-1/3 bg-navy-900 text-white p-8 flex flex-col">
+                      <div className="mb-8">
+                        <div className="w-24 h-24 bg-gold-500 rounded-full mx-auto mb-4 flex items-center justify-center text-navy-900 font-bold text-3xl">
+                          CN
+                        </div>
+                        <h1 className="text-xl font-bold text-center uppercase tracking-wider">[Candidate Name]</h1>
+                        <p className="text-gold-500 text-center text-xs mt-1 uppercase tracking-wide">{viewingTemplate.title}</p>
+                      </div>
+
+                      <div className="mb-8">
+                        <h3 className="text-xs font-bold text-gold-500 uppercase tracking-widest mb-4 border-b border-navy-700 pb-1">Contact</h3>
+                        <div className="space-y-3 text-xs text-gray-300">
+                          <div className="flex items-center"><span className="w-4 mr-2">📧</span> email@example.com</div>
+                          <div className="flex items-center"><span className="w-4 mr-2">📱</span> +250 788 000 000</div>
+                          <div className="flex items-center"><span className="w-4 mr-2">📍</span> Kigali, Rwanda</div>
+                        </div>
+                      </div>
+
+                      <div className="mb-8">
+                        <h3 className="text-xs font-bold text-gold-500 uppercase tracking-widest mb-4 border-b border-navy-700 pb-1">Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {viewingTemplate.skills.split(',').map((skill: string, i: number) => (
+                            <span key={i} className="bg-navy-800 text-white px-2 py-1 rounded text-[10px] font-medium border border-navy-700">
+                              {skill.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-bold text-gold-500 uppercase tracking-widest mb-4 border-b border-navy-700 pb-1">Education</h3>
+                        <div className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
+                          {viewingTemplate.education}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Main Content (Right) */}
+                    <div className="w-2/3 p-8 bg-white">
+                      <div className="mb-8">
+                        <h3 className="text-lg font-bold text-navy-900 uppercase tracking-widest mb-4 flex items-center">
+                          <span className="w-2 h-8 bg-gold-500 mr-3"></span>
+                          Profile
+                        </h3>
+                        <p className="text-gray-600 text-sm leading-relaxed text-justify">
+                          {viewingTemplate.summary}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h3 className="text-lg font-bold text-navy-900 uppercase tracking-widest mb-4 flex items-center">
+                          <span className="w-2 h-8 bg-gold-500 mr-3"></span>
+                          Experience
+                        </h3>
+                        <div className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                          {viewingTemplate.experience}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 pt-2">
+            <div className="flex justify-end space-x-3 pt-4 border-t mt-2">
               <button 
                 onClick={() => setViewingTemplate(null)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 bg-white"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 bg-white font-medium"
               >
                 Close Preview
               </button>
-              <button className="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 flex items-center shadow-sm">
-                <Edit className="h-4 w-4 mr-2" /> Use This Structure
+              <button 
+                onClick={() => alert('Downloading PDF... (Mock)')}
+                className="px-4 py-2 border border-navy-900 text-navy-900 rounded-lg hover:bg-navy-50 bg-white font-medium flex items-center"
+              >
+                <FileText className="h-4 w-4 mr-2" /> Download PDF
+              </button>
+              <button 
+                onClick={handleUseTemplate}
+                className="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 flex items-center shadow-sm font-medium transition-transform active:scale-95"
+              >
+                <Edit className="h-4 w-4 mr-2" /> Use This Template
               </button>
             </div>
           </div>

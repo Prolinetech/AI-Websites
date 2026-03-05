@@ -33,9 +33,22 @@ db.exec(`
     requirements TEXT,
     location TEXT,
     salary TEXT,
+    status TEXT DEFAULT 'Active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(employer_id) REFERENCES users(id)
   );
+
+  // Migration to add status column if it doesn't exist
+  try {
+    const columns = db.prepare("PRAGMA table_info(jobs)").all() as any[];
+    const hasStatus = columns.some(c => c.name === 'status');
+    if (!hasStatus) {
+      db.prepare("ALTER TABLE jobs ADD COLUMN status TEXT DEFAULT 'Active'").run();
+      console.log("Added 'status' column to jobs table.");
+    }
+  } catch (error) {
+    console.error("Error checking/adding status column:", error);
+  }
 
   CREATE TABLE IF NOT EXISTS applications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,6 +228,26 @@ app.delete('/api/jobs/:id', authenticateToken, (req: any, res) => {
   const stmt = db.prepare('DELETE FROM jobs WHERE id = ?');
   stmt.run(id);
   res.json({ success: true });
+});
+
+app.patch('/api/jobs/:id/status', authenticateToken, (req: any, res) => {
+  if (req.user.role !== 'employer' && req.user.role !== 'admin') return res.sendStatus(403);
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['Active', 'Closed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  // Ensure the job belongs to the employer
+  const checkStmt = db.prepare('SELECT employer_id FROM jobs WHERE id = ?');
+  const job = checkStmt.get(id) as any;
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (job.employer_id !== req.user.id && req.user.role !== 'admin') return res.sendStatus(403);
+
+  const stmt = db.prepare('UPDATE jobs SET status = ? WHERE id = ?');
+  stmt.run(status, id);
+  res.json({ success: true, status });
 });
 
 app.get('/api/jobs/:id/applicants', authenticateToken, (req: any, res) => {

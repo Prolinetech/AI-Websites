@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, Download, Save, CreditCard, Loader2, FileText } from 'lucide-react';
+import { Sparkles, Download, Save, CreditCard, Loader2, FileText, Check, Star, Zap, LayoutTemplate, FileCheck, Award, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import Modal from '../../components/Modal';
 import { resumeTemplates } from '../../data/resumeTemplates';
 
 const ResumeBuilder = () => {
   const { user } = useAuth();
+  const [isBuilding, setIsBuilding] = useState(false); // State to toggle between Landing and Builder
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -80,11 +81,187 @@ const ResumeBuilder = () => {
     }
   };
 
+  // --- Landing Page Components ---
+
+  const HeroSection = () => (
+    <div className="bg-navy-900 text-white py-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h1 className="text-4xl md:text-6xl font-serif font-bold mb-6 leading-tight">
+          Build a Standout Resume <br />
+          <span className="text-gold-500">Effortlessly with AI</span>
+        </h1>
+        <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+          Don’t waste precious time staring at a blank page. In just three straightforward steps, you’ll have the perfect resume – polished, compelling, and ready to submit.
+        </p>
+        <button 
+          onClick={() => setIsBuilding(true)}
+          className="bg-gold-500 text-navy-900 px-8 py-4 rounded-full font-bold text-lg hover:bg-gold-400 transition-all transform hover:scale-105 shadow-lg flex items-center mx-auto"
+        >
+          Create my resume <ArrowRight className="ml-2 h-5 w-5" />
+        </button>
+        <div className="mt-12 flex justify-center space-x-8 text-sm text-gray-400">
+          <div className="flex items-center"><Check className="h-4 w-4 mr-2 text-green-400" /> No credit card required</div>
+          <div className="flex items-center"><Check className="h-4 w-4 mr-2 text-green-400" /> ATS-friendly templates</div>
+          <div className="flex items-center"><Check className="h-4 w-4 mr-2 text-green-400" /> Download in PDF</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const StepsSection = () => (
+    <div className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-navy-900 mb-4">3 simple steps to a resume that lands you a job</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          {[
+            { 
+              icon: LayoutTemplate, 
+              title: "Pick your template", 
+              desc: "Select from a wide range of layouts that check all the boxes. Each designed to make you stand out from the crowd." 
+            },
+            { 
+              icon: FileText, 
+              title: "Add your information", 
+              desc: "Can’t find the right words? We’ll walk you through every step and suggest pre-written content based on your role." 
+            },
+            { 
+              icon: Download, 
+              title: "Download your resume", 
+              desc: "Time to impress. Get your resume in PDF format with a simple click. Then watch the interview invites roll in." 
+            }
+          ].map((step, i) => (
+            <div key={i} className="text-center p-6 rounded-xl hover:bg-gray-50 transition-colors">
+              <div className="w-16 h-16 bg-navy-100 rounded-full flex items-center justify-center mx-auto mb-6 text-navy-900">
+                <step.icon className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-bold text-navy-900 mb-3">{step.title}</h3>
+              <p className="text-gray-600 leading-relaxed">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const FeaturesSection = () => (
+    <div className="py-20 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-navy-900 mb-4">Everything you need in one resume maker</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {[
+            {
+              icon: Sparkles,
+              title: "Fill in the blanks with personalized writing assistance from AI.",
+              desc: "If the words aren’t coming to you, you can rely on our AI Assistant to do the crafting for you. Based on your input, we’ll provide strong phrases and content suggestions."
+            },
+            {
+              icon: Award,
+              title: "Achieve perfection with an AI resume score.",
+              desc: "To take your resume from good to great, AI will assess its content and relevance. See how your resume compares to others for the same role and refine every detail."
+            },
+            {
+              icon: FileCheck,
+              title: "Create flawless text with automated proofreading.",
+              desc: "Even the smallest spelling mistake can hurt your application. Our AI expert will carefully proofread all your content and make sure your resume is as error free as can be."
+            },
+            {
+              icon: Zap,
+              title: "Get your resume seen by hiring managers with ATS-friendly templates.",
+              desc: "Don’t let companies’ screening tools take you out of the running. Our templates are formatted to meet the requirements of Applicant Tracking Systems (ATS)."
+            }
+          ].map((feature, i) => (
+            <div key={i} className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-gold-100 rounded-lg flex items-center justify-center text-gold-600">
+                  <feature.icon className="h-6 w-6" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-navy-900 mb-2">{feature.title}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">{feature.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const FAQSection = () => {
+    const [openIndex, setOpenIndex] = useState<number | null>(0);
+    const faqs = [
+      { q: "What is the difference between a resume and a CV?", a: "A resume is typically a one-to-two page document highlighting your skills and experience, while a CV (Curriculum Vitae) is a more detailed document charting your career journey." },
+      { q: "How can I make my resume stand out?", a: "Use our AI-powered enhancement tools to add strong action verbs, quantify your achievements, and ensure your resume is tailored to the job description." },
+      { q: "Are the templates ATS-friendly?", a: "Yes! All our templates are designed to be easily readable by Applicant Tracking Systems used by most employers." }
+    ];
+
+    return (
+      <div className="py-20 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-navy-900 mb-12 text-center">Frequently asked questions</h2>
+          <div className="space-y-4">
+            {faqs.map((faq, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
+                <button 
+                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                  className="w-full flex justify-between items-center p-6 bg-white hover:bg-gray-50 transition-colors text-left"
+                >
+                  <span className="font-bold text-navy-900">{faq.q}</span>
+                  {openIndex === i ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                </button>
+                {openIndex === i && (
+                  <div className="p-6 bg-gray-50 border-t border-gray-200 text-gray-600 leading-relaxed">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const BottomCTA = () => (
+    <div className="bg-navy-900 py-20 text-center">
+      <div className="max-w-4xl mx-auto px-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">75% of resumes get ignored. <br /><span className="text-gold-500">Build one that won’t.</span></h2>
+        <button 
+          onClick={() => setIsBuilding(true)}
+          className="bg-gold-500 text-navy-900 px-10 py-4 rounded-full font-bold text-lg hover:bg-gold-400 transition-all transform hover:scale-105 shadow-lg inline-flex items-center"
+        >
+          Create my resume <ArrowRight className="ml-2 h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!isBuilding) {
+    return (
+      <Layout>
+        <HeroSection />
+        <StepsSection />
+        <FeaturesSection />
+        <FAQSection />
+        <BottomCTA />
+      </Layout>
+    );
+  }
+
+  // --- Builder Interface (Existing Code) ---
+
   return (
     <Layout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-between items-center mb-8">
           <div>
+            <button onClick={() => setIsBuilding(false)} className="text-sm text-gray-500 hover:text-navy-900 mb-2 flex items-center">
+              &larr; Back to Home
+            </button>
             <h1 className="text-3xl font-serif font-bold text-navy-900">AI Resume Builder</h1>
             <p className="text-gray-600">Create a professional hospitality resume in minutes.</p>
           </div>
